@@ -48,7 +48,7 @@ def load_data():
             users_df = pd.concat([users_df.drop(columns=['tags']), users_df_normalized], axis=1)
         users_df = users_df.fillna(value="")
 
-        if 'likes' in users_df.columns:
+        if 'gostei' in users_df.columns:
             users_df['gostei'] = users_df['gostei'].apply(lambda x: extract_name(x))
         if 'playlist' in users_df.columns:
             users_df['playlist'] = users_df['playlist'].apply(lambda x: extract_name(x))
@@ -100,7 +100,7 @@ def recommend_songs(user_id, users_df, songs_df):
         return {"error": "User not found"}
 
     # Verifica se o usuário curtiu alguma música
-    liked_list = user_data['likes'].values[0]
+    liked_list = user_data['gostei'].values[0]
     if not liked_list:
         # Se não tiver curtido nenhuma música, recomenda as 10 músicas mais populares ou recentes
         recommendations = songs_df.head(10).to_dict(orient='records')
