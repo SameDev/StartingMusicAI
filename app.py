@@ -49,7 +49,7 @@ def load_data():
         users_df = users_df.fillna(value="")
 
         if 'likes' in users_df.columns:
-            users_df['likes'] = users_df['likes'].apply(lambda x: extract_name(x))
+            users_df['gostei'] = users_df['gostei'].apply(lambda x: extract_name(x))
         if 'playlist' in users_df.columns:
             users_df['playlist'] = users_df['playlist'].apply(lambda x: extract_name(x))
 
