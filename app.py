@@ -173,9 +173,14 @@ def recommend():
 
     recommendations = recommend_songs(user_id, users_df, songs_df)
 
-    # Garantir serialização de valores compatíveis
+    # Garantir que todos os valores sejam serializáveis
     recommendations = ensure_strings(recommendations)
+
+    # Converter para JSON compatível
+    recommendations = dataframe_to_serializable(pd.DataFrame(recommendations))
+
     return jsonify(recommendations)
+
 
 if __name__ == '__main__':
     app.run()
