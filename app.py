@@ -27,7 +27,7 @@ def get_data(url):
 
 # Função para extrair o nome de itens em uma lista de dicionários
 def extract_name(item_list):
-    return [item['nome'] for item in item_list] if isinstance(item_list, list) else []
+    return [item.get('nome', "") for item in item_list] if isinstance(item_list, list) else []
 
 # Função para carregar e processar os dados
 def load_data():
@@ -39,35 +39,51 @@ def load_data():
         users_df = pd.DataFrame(users_data.get('user', []))
         songs_df = pd.DataFrame(songs_data.get('songs', []))
 
-        # Processar dados dos usuários
-        if 'tags' in users_df.columns:
-            users_df_normalized = pd.json_normalize(users_df['tags'])
-            users_df = pd.concat([users_df.drop(columns=['tags']), users_df_normalized], axis=1)
-        users_df = users_df.fillna(value="")
+        # Validar e corrigir colunas esperadas em usuários
+        if not users_df.empty:
+            users_df = validate_and_fill_columns(users_df, ['id', 'nome', 'tags', 'gostei', 'playlist'])
+            if 'tags' in users_df.columns:
+                users_df = expand_json_column(users_df, 'tags')
+            if 'gostei' in users_df.columns:
+                users_df['gostei'] = users_df['gostei'].apply(lambda x: extract_name(x))
+            if 'playlist' in users_df.columns:
+                users_df['playlist'] = users_df['playlist'].apply(lambda x: extract_name(x))
 
-        if 'gostei' in users_df.columns:
-            users_df['gostei'] = users_df['gostei'].apply(lambda x: extract_name(x))
-        if 'playlist' in users_df.columns:
-            users_df['playlist'] = users_df['playlist'].apply(lambda x: extract_name(x))
-
-        # Processar dados das músicas
-        if 'tags' in songs_df.columns:
-            songs_df_normalized = pd.json_normalize(songs_df['tags'])
-            songs_df = pd.concat([songs_df.drop(columns=['tags']), songs_df_normalized], axis=1)
-        songs_df = songs_df.fillna(value="")
-
-        if 'tags' in songs_df.columns:
-            songs_df['tags'] = songs_df['tags'].apply(lambda x: extract_name(x))
-        if 'playlist' in songs_df.columns:
-            songs_df['playlist'] = songs_df['playlist'].apply(lambda x: extract_name(x))
-        if 'userLiked' in songs_df.columns:
-            songs_df['userLiked'] = songs_df['userLiked'].apply(lambda x: extract_name(x))
+        # Validar e corrigir colunas esperadas em músicas
+        if not songs_df.empty:
+            songs_df = validate_and_fill_columns(songs_df, [
+                'id', 'nome', 'artista', 'url', 'duracao', 'data_lanc', 
+                'image_url', 'albumId', 'tags', 'artistaId', 'playlist', 'userLiked'
+            ])
+            if 'tags' in songs_df.columns:
+                songs_df['tags'] = songs_df['tags'].apply(lambda x: extract_name(x))
+            if 'playlist' in songs_df.columns:
+                songs_df['playlist'] = songs_df['playlist'].apply(lambda x: extract_name(x))
+            if 'userLiked' in songs_df.columns:
+                songs_df['userLiked'] = songs_df['userLiked'].apply(lambda x: extract_name(x))
 
         return users_df, songs_df
 
     except Exception as e:
         logging.error("Erro ao carregar e processar os dados: %s", e)
         return pd.DataFrame(), pd.DataFrame()
+
+# Função para validar e preencher colunas ausentes
+def validate_and_fill_columns(df, expected_columns):
+    for column in expected_columns:
+        if column not in df.columns:
+            logging.warning("Coluna '%s' está ausente no DataFrame. Preenchendo com valores vazios.", column)
+            df[column] = ""
+    return df
+
+# Função para expandir colunas JSON
+def expand_json_column(df, column_name):
+    try:
+        expanded_df = pd.json_normalize(df[column_name])
+        return pd.concat([df.drop(columns=[column_name]), expanded_df], axis=1)
+    except Exception as e:
+        logging.error("Erro ao expandir a coluna JSON '%s': %s", column_name, e)
+        return df
 
 # Função para garantir que todos os valores são strings
 def ensure_strings(data):
@@ -84,25 +100,21 @@ def ensure_strings(data):
 # Função para formatar as músicas no formato desejado
 def format_song(song):
     return {
-        "id": song.get("id"),
-        "nome": song.get("nome"),
-        "artista": song.get("artist", ""),
+        "id": song.get("id", ""),
+        "nome": song.get("nome", ""),
+        "artista": song.get("artista", ""),
         "url": song.get("url", ""),
         "duracao": song.get("duracao", ""),
         "data_lanc": song.get("data_lanc", ""),
         "image_url": song.get("image_url", ""),
         "albumId": song.get("albumId", ""),
-        "tags": [{"id": tag.get("id"), "nome": tag.get("nome")} for tag in song.get("tags", [])],
+        "tags": [{"id": tag.get("id", ""), "nome": tag.get("nome", "")} for tag in song.get("tags", [])],
         "artistaId": song.get("artistaId", []),
         "playlist": song.get("playlist", []),
         "usuarioGostou": song.get("userLiked", [])
     }
 
-# Função para converter o DataFrame para JSON serializável
-def dataframe_to_serializable(df):
-    return df.astype(object).where(pd.notnull(df), None)
-
-# Atualização na função recommend_songs
+# Função de recomendação
 def recommend_songs(user_id, users_df, songs_df):
     try:
         user_id = int(user_id)
@@ -113,29 +125,17 @@ def recommend_songs(user_id, users_df, songs_df):
     if user_data.empty:
         return {"error": "User not found"}
 
-    # Mostrar as colunas disponíveis em songs_df para depuração
-    logging.debug("Colunas disponíveis em songs_df: %s", songs_df.columns.tolist())
-
-    if 'artist' not in songs_df.columns:
-        logging.warning("A coluna 'artist' está ausente em songs_df. Substituindo por uma string vazia.")
-        songs_df['artist'] = ""
-
     liked_list = user_data['gostei'].values[0]
     if not liked_list:
-        recommendations = songs_df.head(10).apply(format_song, axis=1).tolist()
-        return {"songs": recommendations}
+        return {"songs": songs_df.head(10).apply(format_song, axis=1).tolist()}
 
     liked_songs = set(liked_list)
     songs_to_recommend = set(songs_df['nome']) - liked_songs
 
-    # Preencher valores faltantes
-    songs_df['artist'] = songs_df['artist'].fillna("")
-    songs_df['playlist'] = songs_df['playlist'].apply(lambda x: x if isinstance(x, list) else [])
-
     # Criar uma coluna 'information' para cálculos
     songs_df['information'] = (
         songs_df['nome'] + ' ' +
-        songs_df['artist'] + ' ' +
+        songs_df['artista'] + ' ' +
         songs_df['playlist'].apply(lambda x: ' '.join(x))
     )
 
@@ -160,7 +160,7 @@ def recommend_songs(user_id, users_df, songs_df):
 
     return {"songs": recommendations}
 
-# Atualização na rota /recommend
+# Endpoint de recomendação
 @app.route('/recommend', methods=['GET'])
 def recommend():
     user_id = request.args.get('user_id')
@@ -176,11 +176,7 @@ def recommend():
     # Garantir que todos os valores sejam serializáveis
     recommendations = ensure_strings(recommendations)
 
-    # Converter para JSON compatível
-    recommendations = dataframe_to_serializable(pd.DataFrame(recommendations))
-
     return jsonify(recommendations)
-
 
 if __name__ == '__main__':
     app.run()
