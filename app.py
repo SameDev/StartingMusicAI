@@ -4,8 +4,12 @@ import pandas as pd
 import requests
 from sklearn.metrics.pairwise import linear_kernel
 from sklearn.feature_extraction.text import TfidfVectorizer
+from flask_cors import CORS  # Importar CORS
 
 app = Flask(__name__)
+
+# Ativar o CORS
+CORS(app)  # Isso permite que qualquer origem acesse a API. Se quiser restringir, passe o parâmetro `origins=['http://dominio.com']`.
 
 # Configuração do logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -98,7 +102,6 @@ def ensure_strings(data):
     return data
 
 # Função para formatar as músicas no formato desejado
-# Função para formatar as músicas no formato desejado
 def format_song(song):
     # Garantir que "tags" seja uma lista de dicionários
     tags = song.get("tags", [])
@@ -116,12 +119,11 @@ def format_song(song):
         "data_lanc": song.get("data_lanc", ""),
         "image_url": song.get("image_url", ""),
         "albumId": song.get("albumId", ""),
-        "tags": [{"id": tag.get('id'), "nome": tag.get("nome")} for tag in tags],
+        "tags": song.get("tags", []),
         "artistaId": song.get("artistaId", []),
         "playlist": song.get("playlist", []),
         "usuarioGostou": song.get("userLiked", [])
     }
-
 
 # Função de recomendação
 def recommend_songs(user_id, users_df, songs_df):
