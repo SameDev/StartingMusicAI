@@ -116,7 +116,7 @@ def format_song(song):
         "data_lanc": song.get("data_lanc", ""),
         "image_url": song.get("image_url", ""),
         "albumId": song.get("albumId", ""),
-        "tags": [{"id": tag.get("id", ""), "nome": tag.get("nome", "")} for tag in tags],
+        "tags": [{"id": tag.get('id'), "nome": tag.get("nome")} for tag in tags],
         "artistaId": song.get("artistaId", []),
         "playlist": song.get("playlist", []),
         "usuarioGostou": song.get("userLiked", [])
