@@ -22,14 +22,13 @@ songs_api_url = "https://starting-music.onrender.com/music"
 def get_data(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Verifica se houve algum erro HTTP
+        response.raise_for_status() 
         data = response.json()
         return data
     except requests.exceptions.RequestException as e:
         logging.error("Erro ao obter dados da URL %s: %s", url, e)
         return {}
-
-# Função para extrair o nome de itens em uma lista de dicionários
+    
 def extract_name(item_list):
     return [item.get('nome', "") for item in item_list] if isinstance(item_list, list) else []
 
@@ -88,8 +87,7 @@ def expand_json_column(df, column_name):
     except Exception as e:
         logging.error("Erro ao expandir a coluna JSON '%s': %s", column_name, e)
         return df
-
-# Função para garantir que todos os valores são strings
+    
 def ensure_strings(data):
     if isinstance(data, dict):
         return {str(k): ensure_strings(v) for k, v in data.items()}
@@ -97,18 +95,32 @@ def ensure_strings(data):
         return [ensure_strings(item) for item in data]
     elif data is None:
         return ""
-    elif isinstance(data, (int, float)):
-        return str(data)
-    return data
+    elif isinstance(data, (int, float, pd.Timestamp)):
+        return int(data) if isinstance(data, (int, pd.Timestamp)) else int(data)
+    elif isinstance(data, pd.Series):
+        return data.apply(ensure_strings).tolist()  # Para Series do Pandas
+    return str(data) 
+
+
 
 # Função para formatar as músicas no formato desejado
 def format_song(song):
-    # Garantir que "tags" seja uma lista de dicionários
     tags = song.get("tags", [])
-    if isinstance(tags, str):  # Se tags for uma string, transforme-a em uma lista de dicionários vazios
-        tags = [{"id": "", "nome": tags}]
-    elif not isinstance(tags, list):  # Se tags não for nem lista nem string, considere vazio
+    if isinstance(tags, str):  # Caso tags seja uma string (erro comum em serialização)
+        tags = [{"id": tags.find(id), "nome": tags}]
+    elif not isinstance(tags, list):  # Se tags não for uma lista, inicialize como vazia
         tags = []
+
+    # Corrigir inconsistências nos objetos de tags
+    formatted_tags = []
+    for tag in tags:
+        if isinstance(tag, dict):  # Garantir que é um dicionário
+            formatted_tags.append({
+                "id": tag.get("id", ""),
+                "nome": tag.get("nome", "")
+            })
+        else:  # Caso contrário, crie um objeto padrão
+            formatted_tags.append({"id": "", "nome": str(tag)})
 
     return {
         "id": song.get("id", ""),
@@ -119,11 +131,13 @@ def format_song(song):
         "data_lanc": song.get("data_lanc", ""),
         "image_url": song.get("image_url", ""),
         "albumId": song.get("albumId", ""),
-        "tags": song.get("tags", []),
+        "tags": formatted_tags,
         "artistaId": song.get("artistaId", []),
         "playlist": song.get("playlist", []),
         "usuarioGostou": song.get("userLiked", [])
     }
+
+
 
 # Função de recomendação
 def recommend_songs(user_id, users_df, songs_df):
@@ -188,6 +202,7 @@ def recommend():
     recommendations = ensure_strings(recommendations)
 
     return jsonify(recommendations)
+
 
 if __name__ == '__main__':
     app.run()
