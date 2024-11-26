@@ -96,7 +96,7 @@ def ensure_strings(data):
     elif data is None:
         return ""
     elif isinstance(data, (int, float, pd.Timestamp)):
-        return int(data) if isinstance(data, (int, pd.Timestamp)) else int(data)
+        return int(data) if isinstance(data, (int, pd.Timestamp)) else float(data)
     elif isinstance(data, pd.Series):
         return data.apply(ensure_strings).tolist()  # Para Series do Pandas
     return str(data) 
