@@ -98,7 +98,15 @@ def ensure_strings(data):
     return data
 
 # Função para formatar as músicas no formato desejado
+# Função para formatar as músicas no formato desejado
 def format_song(song):
+    # Garantir que "tags" seja uma lista de dicionários
+    tags = song.get("tags", [])
+    if isinstance(tags, str):  # Se tags for uma string, transforme-a em uma lista de dicionários vazios
+        tags = [{"id": "", "nome": tags}]
+    elif not isinstance(tags, list):  # Se tags não for nem lista nem string, considere vazio
+        tags = []
+
     return {
         "id": song.get("id", ""),
         "nome": song.get("nome", ""),
@@ -108,11 +116,12 @@ def format_song(song):
         "data_lanc": song.get("data_lanc", ""),
         "image_url": song.get("image_url", ""),
         "albumId": song.get("albumId", ""),
-        "tags": [{"id": tag.get("id", ""), "nome": tag.get("nome", "")} for tag in song.get("tags", [])],
+        "tags": [{"id": tag.get("id", ""), "nome": tag.get("nome", "")} for tag in tags],
         "artistaId": song.get("artistaId", []),
         "playlist": song.get("playlist", []),
         "usuarioGostou": song.get("userLiked", [])
     }
+
 
 # Função de recomendação
 def recommend_songs(user_id, users_df, songs_df):
