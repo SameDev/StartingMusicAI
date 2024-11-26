@@ -109,6 +109,13 @@ def recommend_songs(user_id, users_df, songs_df):
     if user_data.empty:
         return {"error": "User not found"}
 
+    # Mostrar as colunas disponíveis em songs_df para depuração
+    logging.debug("Colunas disponíveis em songs_df: %s", songs_df.columns.tolist())
+
+    if 'artist' not in songs_df.columns:
+        logging.warning("A coluna 'artist' está ausente em songs_df. Substituindo por uma string vazia.")
+        songs_df['artist'] = ""
+
     liked_list = user_data['gostei'].values[0]
     if not liked_list:
         recommendations = songs_df.head(10).apply(format_song, axis=1).tolist()
@@ -117,14 +124,26 @@ def recommend_songs(user_id, users_df, songs_df):
     liked_songs = set(liked_list)
     songs_to_recommend = set(songs_df['nome']) - liked_songs
 
-    songs_df['information'] = songs_df['nome'] + ' ' + songs_df['artist'] + ' ' + songs_df['playlist'].apply(lambda x: ' '.join(x))
+    # Preencher valores faltantes
+    songs_df['artist'] = songs_df['artist'].fillna("")
+    songs_df['playlist'] = songs_df['playlist'].apply(lambda x: x if isinstance(x, list) else [])
+
+    # Criar uma coluna 'information' para cálculos
+    songs_df['information'] = (
+        songs_df['nome'] + ' ' +
+        songs_df['artist'] + ' ' +
+        songs_df['playlist'].apply(lambda x: ' '.join(x))
+    )
+
     tfidf_vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf_vectorizer.fit_transform(songs_df['information'])
     cosine_similarities = linear_kernel(tfidf_matrix, tfidf_matrix)
 
     similar_songs = {}
     for i, row in enumerate(cosine_similarities):
-        similar_songs_list = [songs_df.iloc[j] for j in row.argsort()[-6:-1][::-1] if i != j]
+        similar_songs_list = [
+            songs_df.iloc[j] for j in row.argsort()[-6:-1][::-1] if i != j
+        ]
         similar_songs[songs_df.iloc[i]['nome']] = similar_songs_list
 
     recommendations = []
@@ -136,6 +155,7 @@ def recommend_songs(user_id, users_df, songs_df):
     recommendations = [format_song(song) for song in recommendations]
 
     return {"songs": recommendations}
+
 
 # Rota para recomendar músicas
 @app.route('/recommend', methods=['GET'])
