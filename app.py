@@ -98,7 +98,11 @@ def format_song(song):
         "usuarioGostou": song.get("userLiked", [])
     }
 
-# Função para recomendar músicas
+# Função para converter o DataFrame para JSON serializável
+def dataframe_to_serializable(df):
+    return df.astype(object).where(pd.notnull(df), None)
+
+# Atualização na função recommend_songs
 def recommend_songs(user_id, users_df, songs_df):
     try:
         user_id = int(user_id)
@@ -156,8 +160,7 @@ def recommend_songs(user_id, users_df, songs_df):
 
     return {"songs": recommendations}
 
-
-# Rota para recomendar músicas
+# Atualização na rota /recommend
 @app.route('/recommend', methods=['GET'])
 def recommend():
     user_id = request.args.get('user_id')
@@ -169,7 +172,10 @@ def recommend():
         return jsonify({"error": "Error loading data"}), 500
 
     recommendations = recommend_songs(user_id, users_df, songs_df)
-    return jsonify(ensure_strings(recommendations))
+
+    # Garantir serialização de valores compatíveis
+    recommendations = ensure_strings(recommendations)
+    return jsonify(recommendations)
 
 if __name__ == '__main__':
     app.run()
