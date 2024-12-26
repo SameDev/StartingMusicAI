@@ -8,27 +8,27 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Ativar o CORS
+# Enable CORS
 CORS(app)
 
-# Configuração do logging
+# Logging configuration
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# URLs das APIs
+# URLs of the APIs
 users_api_url = "https://starting-music.onrender.com/user"
 songs_api_url = "https://starting-music.onrender.com/music"
 
-# Função para obter dados das APIs
+# Function to fetch data from APIs
 def get_data(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        logging.error("Erro ao obter dados da URL %s: %s", url, e)
+        logging.error(f"Error fetching data from URL {url}: {e}")
         return {}
 
-# Função para carregar e processar os dados
+# Function to load and process data
 def load_data():
     try:
         users_data = get_data(users_api_url)
@@ -54,14 +54,11 @@ def load_data():
                 songs_df['userLiked'] = songs_df['userLiked'].apply(lambda x: [item.get('nome', '') for item in x] if isinstance(x, list) else [])
 
         return users_df, songs_df
-
     except Exception as e:
-        logging.error("Erro ao carregar e processar os dados: %s", e)
+        logging.error(f"Error loading and processing data: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
-
-
-# Função para formatar as músicas no formato desejado
+# Function to format songs
 def format_song(song):
     return {
         "id": song.get("id", ""),
@@ -76,7 +73,7 @@ def format_song(song):
         "usuarioGostou": song.get("userLiked", [])
     }
 
-# Função de recomendação
+# Function to recommend songs
 def recommend_songs(user_id, users_df, songs_df):
     try:
         user_id = int(user_id)
@@ -88,20 +85,22 @@ def recommend_songs(user_id, users_df, songs_df):
         return {"error": "User not found"}
 
     liked_list = user_data['gostei'].values[0]
+
     if not liked_list:
         return {"songs": songs_df.head(10).apply(format_song, axis=1).tolist()}
-
-    # Filtrar músicas não curtidas
+    
     unliked_songs_df = songs_df[~songs_df['nome'].isin(liked_list)].reset_index(drop=True)
 
-    # Criar coluna de informações para cálculo de similaridade
+    if unliked_songs_df.empty:
+        return {"message": "No unliked songs found for this user."}
+
     songs_df['information'] = (
         songs_df['nome'].fillna('') + ' ' +
         songs_df['artista'].fillna('') + ' ' +
         songs_df['tags'].apply(lambda x: ' '.join(x) if isinstance(x, list) else '').fillna('')
     )
 
-    # Vetorizar com TF-IDF
+    # Vectorize with TF-IDF
     tfidf_vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf_vectorizer.fit_transform(songs_df['information'])
 
@@ -111,16 +110,18 @@ def recommend_songs(user_id, users_df, songs_df):
         liked_tfidf = tfidf_matrix[liked_song_indices]
         unliked_tfidf = tfidf_matrix[len(liked_list):]
         cosine_similarities = linear_kernel(liked_tfidf, unliked_tfidf)
-
-        # Obter músicas mais similares
         similar_indices = cosine_similarities.mean(axis=0).argsort()[::-1]
-        recommendations = unliked_songs_df.iloc[similar_indices[:10]].apply(format_song, axis=1).tolist()
+
+        # Ensure indices are within bounds
+        similar_indices = [i for i in similar_indices if i < len(unliked_songs_df)]
+        num_similar_songs = min(len(similar_indices), 10)
+        recommendations = unliked_songs_df.iloc[similar_indices[:num_similar_songs]].apply(format_song, axis=1).tolist()
     else:
         recommendations = songs_df.head(10).apply(format_song, axis=1).tolist()
 
     return {"songs": recommendations}
 
-# Endpoint de recomendação
+# Recommendation endpoint
 @app.route('/recommend', methods=['GET'])
 def recommend():
     user_id = request.args.get('user_id')
