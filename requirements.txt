@@ -5,3 +5,5 @@ numpy==1.24.3
 pandas==2.0.3
 gunicorn==20.1.0
 flask_cors==5.0.0
+Word2Vec==0.11.1
+gensim==4.3.3

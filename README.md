@@ -1,108 +1,96 @@
----
-# Starting Music Recommendation System
+# Sistema de Recomendação de Músicas - Starting Music
 
-## Overview
-The Starting Music Recommendation System is an AI-powered recommendation engine designed to suggest songs to users based on their listening history and preferences. It is built using Python and Flask, leveraging the power of machine learning techniques to provide personalized music recommendations. The system is a core component of the Starting Music platform, which helps emerging artists showcase their work and enables listeners to discover new music tailored to their tastes.
+Este projeto implementa um sistema de recomendação de músicas baseado em inteligência artificial utilizando o modelo **Word2Vec** para gerar sugestões personalizadas com base nas preferências dos usuários. O sistema acessa dados sobre usuários e músicas através de APIs e utiliza a similaridade entre músicas para recomendar as mais relevantes para cada usuário.
 
-## How It Works
-The recommendation engine operates by analyzing user data and music metadata retrieved from external APIs. It uses a combination of content-based filtering and similarity calculations to generate recommendations.
+## Como Funciona
 
-## Data Collection
-**User Data:** Information about users, including their liked songs, playlists, and tags, is fetched from the user API.
-**Song Data:** Information about songs, including song name, artist, album, tags, and playlists, is fetched from the music API.
+### Fluxo de Recomendação
 
-## Data Processing
-1. Normalization and Structuring:
+1. **Coleta de Dados**: O sistema acessa duas APIs externas:
+   - **Usuários**: Contém informações sobre os usuários, incluindo quais músicas eles gostaram.
+   - **Músicas**: Contém dados sobre músicas, incluindo tags e playlists associadas.
 
-    - The user and song data are normalized and transformed into a format suitable for analysis. Nested data structures like tags and playlists are extracted and flattened.
+2. **Pré-processamento**: A partir dos dados coletados, as tags e playlists das músicas são processadas para formar listas de palavras que descrevem cada música. Além disso, as músicas que os usuários gostaram são coletadas.
 
-2. Content-Based Filtering:
+3. **Treinamento do Modelo Word2Vec**: O modelo Word2Vec é treinado com base nas tags e playlists das músicas. O Word2Vec é um algoritmo de aprendizagem de máquina que transforma palavras (tags/descrições) em vetores numéricos, permitindo calcular a similaridade entre elas.
 
-    - A TF-IDF (Term Frequency-Inverse Document Frequency) vectorizer is applied to the song metadata to convert text information (such as song names, artists, and tags) into numerical vectors.
-    - The system calculates the cosine similarity between songs based on these vectors, identifying which songs are similar to each other.
+4. **Geração de Vetores para Músicas**: Para cada música, um vetor é gerado utilizando o modelo Word2Vec, representando a música com base em suas tags e playlists.
 
-## Recommendation Logic
-1. User Preferences:
+5. **Cálculo de Similaridade**: Quando um usuário solicita recomendações, o sistema cria um vetor de preferências para o usuário com base nas músicas que ele já gostou. A similaridade entre as músicas preferidas e todas as músicas do catálogo é calculada usando a **similaridade de cosseno**.
 
-    - When a user requests recommendations, the system checks their liked songs. If the user has liked any songs, the system searches for similar songs using the cosine similarity scores.
+6. **Recomendações**: As músicas mais semelhantes às preferências do usuário são recomendadas, levando em conta a similaridade entre as músicas.
 
-2. Fallback Recommendations:
+### Componentes Principais
 
-    - If the user has not liked any songs yet, the system provides a fallback recommendation list, which includes the most popular or recently added songs.
+- **`load_data()`**: Carrega os dados dos usuários e das músicas a partir das APIs externas e organiza-os em DataFrames do Pandas.
+- **`train_word2vec()`**: Treina o modelo Word2Vec a partir das tags e playlists das músicas.
+- **`get_song_vector()`**: Converte as tags de uma música em um vetor numérico usando o modelo Word2Vec.
+- **`get_user_embedding()`**: Cria um vetor de preferências para o usuário baseado nas músicas que ele gostou.
+- **`recommend_songs()`**: Gera as recomendações para o usuário com base no cálculo da similaridade de cosseno entre os vetores das músicas.
 
-3. Recommendation Output:
+## Como Usar
 
-    - The system outputs a list of up to 10 song recommendations, ensuring they are in a user-friendly format. All output values are converted to strings to maintain consistency.
+### Requisitos
 
-## API Endpoint
+- Python 3.7 ou superior
+- Flask
+- Flask-CORS
+- Pandas
+- Numpy
+- Gensim
+- scikit-learn
+- Requests
 
-- GET /recommend: This endpoint receives a user_id as a query parameter and returns a JSON response containing recommended songs for the user.
+### Instalação
 
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/seu-repositorio/starting-music.git
+   cd starting-music
+   ```
 
-### Example Response:
+2. Instale as dependências:
+  ```bash
+  pip install -r requirements.txt
+  ```
+3. Inicie o servidor Flask:
+  ```bash
+  python app.py
+  ```
+4. O servidor estará rodando em http://localhost:5000. Agora você pode testar as recomendações.
 
+### Endpoint para Recomendação
+- **GET** /recommend: Gera recomendações de músicas para um usuário.
+#### Parâmetros
+- user_id: ID do usuário para o qual as recomendações serão geradas.
 
+Exemplo de requisição:
+```bash
+curl "http://localhost:5000/recommend?user_id=1"
+```
+Resposta de exemplo:
 ```json
 {
   "songs": [
     {
-      "id": 35,
-      "name": "Amiga da Minha Mulher",
-      "artist": "Seu Sacani",
-      "url": "https://example.com/audio/amiga_da_minha_mulher",
-      "duration": "",
-      "release_date": "2024-02-20T00:00:00.000Z",
-      "image_url": "https://example.com/images/amiga_da_minha_mulher",
-      "albumId": 47,
-      "tags": [
-        {
-          "id": 16,
-          "name": "Acoustic"
-        },
-        {
-          "id": 17,
-          "name": "Samba/Pagode"
-        }
-      ],
-      "artistId": [],
-      "playlist": [],
-      "userLiked": []
+      "nome": "Música A",
+      "tags": ["rock", "pop"],
+      "score": 0.89
+    },
+    {
+      "nome": "Música B",
+      "tags": ["indie", "alternativo"],
+      "score": 0.85
     }
   ]
 }
 ```
-
-## Installation and Setup
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/starting-music-recommendation.git
-cd starting-music-recommendation
+- Erro (quando user_id não é fornecido ou inválido):
+```json 
+{
+  "error": "User ID is required"
+}
 ```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the Flask application:
-
-```bash
-python app.py
-```
-
-4. Access the recommendation endpoint:
-
-- Navigate to ***http://localhost:5000/recommend?user_id=1*** to get recommendations for a user with user_id=1.
-
-## Dependencies
-- **Flask:** For building the web application.
-- **Pandas:** For data manipulation and processing.
-- **Requests:** For making API calls to fetch user and song data.
-- **Scikit-learn:** For implementing TF-IDF vectorization and cosine similarity calculations.
-- **Logging:** For tracking and debugging application behavior.
 
 ## Contributing
 - If you'd like to contribute to this project, please fork the repository and use a feature branch. Pull requests are warmly welcome.
